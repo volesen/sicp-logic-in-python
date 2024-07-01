@@ -1,2 +1,5 @@
-def hello() -> str:
-    return "Hello from sicp-logic-in-python!"
+from .query import query
+
+__all__ = [
+    "query",
+]

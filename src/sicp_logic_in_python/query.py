@@ -1,8 +1,17 @@
-from typing import Iterable
+from typing import Callable, Iterable
 
 from .db import DB
+from .instantiate import instantiate
 from .rule import rename_variables
 from .unification import unify
+
+
+def query(
+    query,
+    db: DB,
+):
+    for frame in qeval(query, [{}], db):
+        yield instantiate(query, frame)
 
 
 def qeval(
@@ -20,11 +29,47 @@ def qeval(
         case ["and", *conjuncts]:
             yield from conjoin(conjuncts, frames, db)
 
-        case [query]:
+        case ["python-value", predicate, *args]:
+            yield from python_value(predicate, args, frames, db)
+
+        case (query,):
             yield from simple_query(query, frames, db)
 
         case _:
             yield from simple_query(query, frames, db)
+
+
+def negate(
+    operands: Iterable[tuple],
+    frames: Iterable[dict],
+    db: DB,
+) -> Iterable[dict]:
+    for frame in frames:
+        for extended_frame in qeval(operands, [frame], db):
+            break
+        else:
+            yield frame
+
+
+def conjoin(
+    conjuncts: Iterable[tuple],
+    frames: Iterable[dict],
+    db: DB,
+) -> Iterable[dict]:
+    for conjunct in conjuncts:
+        frames = qeval(conjunct, frames, db)
+
+    return frames
+
+
+def disjoin(
+    disjuncts: Iterable[tuple],
+    frames: Iterable[dict],
+    db: DB,
+) -> Iterable[dict]:
+    for frame in frames:
+        for disjunct in disjuncts:
+            yield from qeval(disjunct, [frame], db)
 
 
 def simple_query(
@@ -70,35 +115,12 @@ def apply_rule(
         yield from qeval(body, [extended_frame], db)
 
 
-def conjoin(
-    conjuncts: Iterable[tuple],
-    frames: Iterable[dict],
-    db: DB,
-) -> Iterable[dict]:
-    for conjunct in conjuncts:
-        frames = qeval(conjunct, frames, db)
-
-    return frames
-
-
-def disjoin(
-    disjuncts: Iterable[tuple],
+def python_value(
+    predicate: Callable,
+    args: Iterable,
     frames: Iterable[dict],
     db: DB,
 ) -> Iterable[dict]:
     for frame in frames:
-        for disjunct in disjuncts:
-            yield from qeval(disjunct, [frame], db)
-
-
-def negate(
-    operands: Iterable[tuple],
-    frames: Iterable[dict],
-    db: DB,
-) -> Iterable[dict]:
-    for frame in frames:
-        for extended_frame in qeval(operands, [frame], db):
-            break
-        else:
-            # Either there are no matches or the loop was not entered
+        if predicate(*instantiate(args, frame)):
             yield frame
