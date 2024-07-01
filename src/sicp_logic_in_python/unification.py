@@ -29,6 +29,8 @@ def unify(
                 return None
 
         return frame
+    
+    return None
 
 
 def extend_if_possible(
