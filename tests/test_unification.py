@@ -1,11 +1,28 @@
-from sicp_logic_in_python.unification import pattern_match, extend_if_consistent
+from sicp_logic_in_python.unification import extend_if_possible, unify
 
 
-def test_pattern_match(): ...
+def test_unify():
+    assert unify(
+        ("?x", 2, "?z"),
+        (1, "?y", 3),
+        frame={},
+    ) == {
+        "?x": 1,
+        "?y": 2,
+        "?z": 3,
+    }
+
+    assert unify(
+        ("?x", "?x"),
+        ("?y", "?y"),
+        frame={},
+    ) == {
+        "?x": "?y",
+    }
 
 
-def test_extend_if_consistent():
-    assert extend_if_consistent(
+def test_extend_if_possible():
+    assert extend_if_possible(
         "?x",
         ("f", "a"),
         frame={"?x": ("f", "?y")},
@@ -14,9 +31,8 @@ def test_extend_if_consistent():
         "?y": "a",
     }
 
-    # Negative test
     assert (
-        extend_if_consistent(
+        extend_if_possible(
             "?x",
             ("f", "b"),
             frame={"?x": ("f", "?y"), "?y": "a"},

@@ -5,47 +5,59 @@ def is_variable(x) -> bool:
     return isinstance(x, str) and x.startswith("?")
 
 
-def pattern_match(
-    pattern,
-    datum,
+def unify(
+    pattern1,
+    pattern2,
     frame: dict,
 ) -> dict | None:
-    frame = frame.copy()
-
-    if frame is None:
-        return None
-
-    if pattern == datum:
+    if pattern1 == pattern2:
         return frame
 
-    if is_variable(pattern):
-        return extend_if_consistent(pattern, datum, frame)
+    if is_variable(pattern1):
+        return extend_if_possible(pattern1, pattern2, frame)
 
-    if isinstance(pattern, (list, tuple)) and isinstance(datum, (list, tuple)):
-        if len(pattern) != len(datum):
+    if is_variable(pattern2):
+        return extend_if_possible(pattern2, pattern1, frame)
+
+    if isinstance(pattern1, (list, tuple)) and isinstance(pattern2, (list, tuple)):
+        if len(pattern1) != len(pattern2):
             return None
 
-        for p, d in zip(pattern, datum):
-            frame = pattern_match(p, d, frame)
+        for p1, p2 in zip(pattern1, pattern2):
+            frame = unify(p1, p2, frame)
             if frame is None:
                 return None
 
         return frame
 
-    return None
 
-
-def extend_if_consistent(
+def extend_if_possible(
     var: str,
-    dat: Any,
+    val: Any,
     frame: dict,
 ) -> dict | None:
     if var in frame:
-        # If the variable is already bound to a value in the frame, then we need to check if the
-        # bound value can be matched with the datum. E.g. if the frame is {"?x": ("f", "?y")},
-        # and we are trying to match "?x" with ("f", "a"), then we need to check if "?y" can be
-        # matched with "a".
-        return pattern_match(frame[var], dat, frame)
+        return unify(frame[var], val, frame)
 
-    frame[var] = dat
+    if is_variable(val) and val in frame:
+        return unify(var, frame[val], frame)
+
+    if depends_on(val, var, frame):
+        return None
+
+    frame = frame.copy()
+    frame[var] = val
     return frame
+
+
+def depends_on(expr, var, frame) -> bool:
+    if expr == var:
+        return True
+
+    if expr in frame:
+        return depends_on(frame[expr], var, frame)
+
+    if isinstance(expr, (list, tuple)):
+        return any(depends_on(x, var, frame) for x in expr)
+
+    return False
